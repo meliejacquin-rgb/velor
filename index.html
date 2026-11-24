@@ -32,6 +32,17 @@
         <input id="w-name" name="name" autocomplete="given-name" maxlength="30" placeholder="Votre prénom">
         <span class="hint">L'appli vous accueillera avec votre prénom. Vous pourrez le changer dans Réglages.</span>
       </div>
+      <div class="field"><label>Votre trajet habituel (domicile – travail)</label></div>
+      <div class="two">
+        <div class="field"><label for="w-km" class="sub">Distance (km)</label><input id="w-km" inputmode="decimal" placeholder="5"></div>
+        <div class="field"><label for="w-min" class="sub">Durée (min)</label><input id="w-min" inputmode="numeric" placeholder="20"></div>
+      </div>
+      <span class="hint" style="margin-top:-8px">Vous pourrez ajouter d'autres trajets (sport, courses…) et tout chronométrer.</span>
+      <div class="field">
+        <label for="w-kg">Votre poids <span style="font-weight:400;color:var(--muted)">(facultatif)</span></label>
+        <input id="w-kg" inputmode="decimal" placeholder="kg">
+        <span class="hint">Il sert seulement à calculer les calories. Sans lui, VélOr affiche une fourchette.</span>
+      </div>
       <div class="field"><label>Votre prix de référence</label></div>
       <div class="radios" role="radiogroup" aria-label="Tarif de référence" id="w-price">
         <button type="button" class="opt" role="radio" data-price="1.9" aria-checked="true">
@@ -115,7 +126,7 @@
         <svg class="chart" id="chart" viewBox="0 0 320 170" role="img" aria-label="Économies par période"></svg>
       </div>
       <div class="facts">
-        <div class="fact"><div class="k">Trajets à vélo</div><div class="v num" id="f-trips"></div><div class="s" id="f-trips-s"></div></div>
+        <div class="fact"><div class="k">Trajets qui remplacent le tram</div><div class="v num" id="f-trips"></div><div class="s" id="f-trips-s"></div></div>
         <div class="fact"><div class="k">Carnets non achetés</div><div class="v num" id="f-carnets"></div><div class="s">carnet de 10 à 17 €</div></div>
         <div class="fact"><div class="k">Moyenne par jour</div><div class="v num" id="f-avg"></div><div class="s">sur la période</div></div>
         <div class="fact"><div class="k">Meilleur jour</div><div class="v num" id="f-best"></div><div class="s" id="f-best-s"></div></div>
@@ -148,6 +159,7 @@
           <div class="cell"><div class="k">Distance</div><div class="v num" id="h-km"></div></div>
         </div>
         <ul class="effects" id="effects"></ul>
+        <div class="reliab" id="reliab"></div>
         <div>
           <div style="font-weight:700;font-size:14px;margin-bottom:6px">Comment vous sentez-vous après le trajet&nbsp;?</div>
           <div class="mood" id="mood"></div>

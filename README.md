@@ -6,11 +6,12 @@ C'est une application web installable (PWA) : elle s'ouvre dans le navigateur, s
 
 ## Fonctionnalités
 
-- **Accueil** : accueil avec votre prénom, économies du mois et barre d'objectif, montants du jour, de la semaine et depuis le début. Boutons « Aller simple » et « Aller-retour », annulation, et correction d'un jour de la semaine en le touchant.
+- **Accueil** : accueil avec votre prénom, économies du mois et barre d'objectif, montants du jour, de la semaine et depuis le début.
+- **Ajout de trajets** : vos trajets favoris (Boulot, Courses, Sport…) s'ajoutent en un geste, avec « + le retour ». Un trajet « Autre » se mesure en traçant départ et arrivée sur une carte, ou en saisissant les km. Le chrono (Démarrer / Je suis arrivé) mesure la durée réelle. Chaque trajet indique s'il remplace un ticket de tram : seuls ceux-là comptent dans les économies, tous comptent pour la santé et le CO₂. Toucher un jour de la semaine affiche ses trajets pour en supprimer ou en ajouter.
 - **Stats** : semaine, mois, année ou tout, avec graphique, comparaison avec la période précédente et carnets non achetés.
-- **Impact** : minutes d'activité par rapport aux 150 min/semaine de l'OMS, calories, distance, ressenti après le trajet, CO₂ évité par rapport à la voiture, au bus et au tram.
+- **Impact** : minutes d'activité par rapport aux 150 min/semaine de l'OMS, calories, distance, ressenti après le trajet, CO₂ évité par rapport à la voiture, au bus et au tram. Un encadré « Fiabilité des chiffres » indique d'où viennent les données.
 - **Défis** : niveaux et XP, série de jours (les week-ends ne la cassent pas), objectifs mensuel et hebdomadaire, 12 badges.
-- **Réglages** : prénom, 6 thèmes de couleurs avec leur logo plus une couleur personnalisée, mode clair, sombre ou automatique, prix de référence (ticket 1,90 € ou carnet de 10 à 17 €), objectifs, durée, distance et poids du trajet type, export et import des données.
+- **Réglages** : prénom, poids (facultatif), trajets favoris, 6 thèmes de couleurs avec leur logo plus une couleur personnalisée, mode clair, sombre ou automatique, prix de référence (ticket 1,90 € ou carnet de 10 à 17 €), objectifs, export et import des données.
 
 ## Tarifs et estimations
 
@@ -19,7 +20,8 @@ C'est une application web installable (PWA) : elle s'ouvre dans le navigateur, s
 | Ticket de tram (aller) | 1,90 € |
 | Carnet de 10 tickets | 17 €, soit 1,70 € le trajet |
 | CO₂ par km et par passager | voiture ≈ 218 g, bus ≈ 113 g, tram ≈ 4,3 g, vélo 0 g (ordres de grandeur ADEME) |
-| Calories | 6,8 MET × poids × durée (vélo à allure modérée) |
+| Calories | 6,8 MET × poids × durée réelle du trajet (vélo à allure modérée). Sans poids : fourchette pour 55 à 85 kg, affichée avec « ≈ » |
+| Distance tracée sur la carte | vol d'oiseau × 1,3 pour tenir compte des rues |
 | Essence | 6,5 L aux 100 km |
 
 ## Lancer en local

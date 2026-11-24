@@ -49,79 +49,118 @@
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   // ---------- État ----------
+  // Chaque trajet est enregistré avec sa distance, sa durée et la façon dont elles ont été obtenues,
+  // pour que les chiffres santé et CO₂ reposent sur des mesures et pas sur une moyenne.
   const STORE_KEY = 'velor-v1';
+  const KG_RANGE = [55, 85]; // fourchette utilisée tant que le poids n'est pas renseigné
+  const DETOUR = 1.3;        // distance à vol d'oiseau × 1,3 ≈ distance réelle à vélo en ville
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const defaultFavs = () => [{ id: 'boulot', name: 'Boulot', km: 5, min: 20, tram: true }];
   const defaults = () => ({
-    v: 1, onboarded: false,
-    profile: { name: '', palette: 'outremer', custom: '#213BCA', mode: 'auto' },
-    hist: {}, mood: {}, price: 1.9, goalM: 40, goalW: 8, min: 20, km: 5, kg: 65, log: []
+    v: 2, onboarded: false,
+    profile: { name: '', palette: 'outremer', custom: '#213BCA', mode: 'auto', kg: null },
+    trips: [], favs: defaultFavs(), mood: {}, price: 1.9, goalM: 40, goalW: 8, chrono: null, undo: []
   });
+  function migrate(raw) {
+    const d = defaults();
+    const st2 = { ...d, ...raw, profile: { ...d.profile, ...(raw.profile || {}) } };
+    if (raw.v !== 2) { // version 1 : un simple compteur de trajets par jour
+      const km = raw.km || 5, min = raw.min || 20;
+      st2.favs = [{ id: 'boulot', name: 'Boulot', km, min, tram: true }];
+      st2.trips = [];
+      Object.entries(raw.hist || {}).forEach(([k, n]) => { for (let i = 0; i < n; i++) st2.trips.push({ id: uid(), k, km, min, fav: 'boulot', name: 'Boulot', tram: true, dur: 'favori', dist: 'favori' }); });
+      if (raw.kg && raw.kg !== 65) st2.profile.kg = raw.kg; // 65 kg était la valeur par défaut, pas une saisie
+      st2.v = 2; delete st2.hist; delete st2.log; delete st2.km; delete st2.min; delete st2.kg;
+    }
+    if (!Array.isArray(st2.trips)) st2.trips = [];
+    if (!Array.isArray(st2.favs) || !st2.favs.length) st2.favs = defaultFavs();
+    if (!Array.isArray(st2.undo)) st2.undo = [];
+    return st2;
+  }
   function load() {
-    try {
-      const raw = JSON.parse(localStorage.getItem(STORE_KEY));
-      if (raw && typeof raw === 'object') { const d = defaults(); return { ...d, ...raw, profile: { ...d.profile, ...(raw.profile || {}) } }; }
-    } catch (e) { /* stockage indisponible */ }
+    try { const raw = JSON.parse(localStorage.getItem(STORE_KEY)); if (raw && typeof raw === 'object') return migrate(raw); } catch (e) { /* stockage indisponible */ }
     return defaults();
   }
   let st = load();
-  const save = () => { try { localStorage.setItem(STORE_KEY, JSON.stringify(st)); } catch (e) { /* ignoré */ } };
+  let byDay = {};
+  function reindex() { byDay = {}; st.trips.forEach(t => (byDay[t.k] = byDay[t.k] || []).push(t)); }
+  reindex();
+  const save = () => { reindex(); try { localStorage.setItem(STORE_KEY, JSON.stringify(st)); } catch (e) { /* ignoré */ } };
+  if (st.onboarded) save(); // enregistre tout de suite une éventuelle migration
 
   function sample() {
     let s = 7; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
-    const h = {}, m = {};
-    for (let i = 210; i >= 1; i--) {
-      const d = addDays(today, -i), wd = dow(d) < 5, p = rnd();
-      let n = wd ? (p < .68 ? 2 : p < .82 ? 1 : 0) : (p < .25 ? 2 : p < .35 ? 1 : 0);
-      if (d.getMonth() === 7 && rnd() < .6) n = 0;
-      if (n) { h[key(d)] = n; const q = rnd(); m[key(d)] = q < .45 ? 0 : q < .75 ? 1 : q < .9 ? 2 : 3; }
+    const favs = [
+      { id: 'boulot', name: 'Boulot', km: 5.2, min: 21, tram: true },
+      { id: 'courses', name: 'Courses', km: 1.8, min: 8, tram: true },
+      { id: 'sport', name: 'Balade', km: 14, min: 50, tram: false }
+    ];
+    const trips = [], mood = {};
+    const add = (k, f) => trips.push({ id: uid(), k, km: f.km, min: Math.max(5, Math.round(f.min + (rnd() - .5) * 6)), fav: f.id, name: f.name, tram: f.tram, dur: rnd() < .6 ? 'chrono' : 'favori', dist: 'favori' });
+    for (let i = 210; i >= 0; i--) {
+      const d = addDays(today, -i), k = key(d), wd = dow(d) < 5, p = rnd();
+      if (d.getMonth() === 7 && rnd() < .6) continue;
+      if (i === 0) { add(k, favs[0]); break; }
+      if (wd) { if (p < .68) { add(k, favs[0]); add(k, favs[0]); } else if (p < .82) add(k, favs[0]); if (rnd() < .15) add(k, favs[1]); }
+      else { if (p < .25) add(k, favs[2]); if (rnd() < .3) { add(k, favs[1]); add(k, favs[1]); } }
+      if (byDayOf(trips, k)) { const q = rnd(); mood[k] = q < .45 ? 0 : q < .75 ? 1 : q < .9 ? 2 : 3; }
     }
-    h[key(today)] = 1;
-    return { h, m };
+    return { trips, mood, favs };
   }
+  const byDayOf = (list, k) => list.some(t => t.k === k);
 
   // ---------- Calculs ----------
-  const trips = d => st.hist[key(d)] || 0;
-  function sumRange(a, b) { let n = 0; for (let d = new Date(a); d <= b; d = addDays(d, 1)) n += trips(d); return n; }
-  const allTrips = () => Object.values(st.hist).reduce((a, b) => a + b, 0);
+  const dayList = d => byDay[typeof d === 'string' ? d : key(d)] || [];
+  const trips = d => dayList(d).filter(t => t.tram).length;  // trajets qui remplacent un ticket (économies)
+  const rides = d => dayList(d).length;                       // tous les trajets à vélo (série, activité)
+  function sumRange(a, b, f = trips) { let n = 0; for (let d = new Date(a); d <= b; d = addDays(d, 1)) n += f(d); return n; }
+  function tripsIn(a, b) { const ka = key(a), kb = key(b); return st.trips.filter(t => t.k >= ka && t.k <= kb); }
+  const allTrips = () => st.trips.filter(t => t.tram).length;
   function firstDay() {
-    const ks = Object.keys(st.hist).filter(k => st.hist[k] > 0).sort();
-    if (!ks.length) return today;
-    const [y, m, dd] = ks[0].split('-').map(Number); return new Date(y, m - 1, dd, 12);
+    if (!st.trips.length) return today;
+    const k0 = st.trips.reduce((m, t) => t.k < m ? t.k : m, st.trips[0].k);
+    const [y, m, dd] = k0.split('-').map(Number); return new Date(y, m - 1, dd, 12);
   }
   const money = n => n * st.price;
-  const kcalPerTrip = () => 6.8 * st.kg * st.min / 60; // MET vélo modéré
+  const kcalOf = (min, kg) => 6.8 * kg * min / 60; // MET 6,8 : vélo à allure modérée
+  const kcalRange = list => { const m = list.reduce((a, t) => a + t.min, 0); return st.profile.kg ? [kcalOf(m, st.profile.kg), kcalOf(m, st.profile.kg)] : [kcalOf(m, KG_RANGE[0]), kcalOf(m, KG_RANGE[1])]; };
+  const fmtKcal = ([a, b]) => a === b ? Math.round(a).toLocaleString('fr-FR') : '≈ ' + Math.round(a).toLocaleString('fr-FR') + '–' + Math.round(b).toLocaleString('fr-FR');
   const monthStart = () => new Date(today.getFullYear(), today.getMonth(), 1, 12);
+  const fmtKm = km => km.toLocaleString('fr-FR', { maximumFractionDigits: km < 100 ? 1 : 0 }) + ' km';
 
   function streak() {
     let d = new Date(today), n = 0;
-    if (!trips(d)) d = addDays(d, -1);
-    for (let i = 0; i < 800; i++) { if (trips(d)) n++; else if (dow(d) < 5) break; d = addDays(d, -1); }
+    if (!rides(d)) d = addDays(d, -1);
+    for (let i = 0; i < 800; i++) { if (rides(d)) n++; else if (dow(d) < 5) break; d = addDays(d, -1); }
     return n;
   }
   function bestStreak() {
     let best = 0, cur = 0;
-    for (let d = firstDay(); d <= today; d = addDays(d, 1)) { if (trips(d)) { cur++; best = Math.max(best, cur); } else if (dow(d) < 5) cur = 0; }
+    for (let d = firstDay(); d <= today; d = addDays(d, 1)) { if (rides(d)) { cur++; best = Math.max(best, cur); } else if (dow(d) < 5) cur = 0; }
     return best;
   }
   function level() {
-    const xp = allTrips() * 10 + streak() * 5;
+    const xp = st.trips.length * 10 + streak() * 5;
     let lv = 1; while (xp >= 50 * lv * (lv + 1)) lv++;
     return { lv, xp, lo: 50 * (lv - 1) * lv, hi: 50 * lv * (lv + 1), name: LEVELS[Math.min(lv - 1, LEVELS.length - 1)] };
   }
   function badges() {
-    const tot = allTrips(), saved = money(tot), bs = bestStreak();
-    const monthTrips = sumRange(monthStart(), today);
-    const weekMin = sumRange(monday, today) * st.min, co2kg = tot * st.km * G.car / 1000;
+    const tot = allTrips(), saved = money(tot), bs = bestStreak(), all = st.trips.length;
+    const monthRides = sumRange(monthStart(), today, rides);
+    const weekMin = tripsIn(monday, today).reduce((a, t) => a + t.min, 0);
+    const kmAll = st.trips.reduce((a, t) => a + t.km, 0), co2kg = kmAll * G.car / 1000;
+    const kcalLow = kcalRange(st.trips)[0];
     const GOLD = '#F2A20C', BLUE = '#213BCA', RED = '#FF5A5F', MINT = '#14A37F';
     return [
-      { n: 'Premier coup de pédale', d: '1 trajet', p: Math.min(1, tot / 1), c: GOLD },
-      { n: 'Carnet remboursé', d: '10 trajets, 17 € gardés', p: Math.min(1, tot / 10), c: BLUE },
+      { n: 'Premier coup de pédale', d: '1 trajet', p: Math.min(1, all / 1), c: GOLD },
+      { n: 'Carnet remboursé', d: '10 tickets évités, 17 € gardés', p: Math.min(1, tot / 10), c: BLUE },
       { n: 'Semaine parfaite', d: '5 jours de suite', p: Math.min(1, bs / 5), c: BLUE },
       { n: 'Tirelire de 50 €', d: '50 € économisés', p: Math.min(1, saved / 50), c: GOLD },
       { n: 'Cœur vaillant', d: '150 min en une semaine', p: Math.min(1, weekMin / 150), c: RED },
       { n: 'Pousse verte', d: '10 kg de CO₂ évités', p: Math.min(1, co2kg / 10), c: MINT },
-      { n: 'Centurion', d: '100 trajets', p: Math.min(1, tot / 100), c: BLUE },
-      { n: 'Mois en or', d: '30 trajets dans le mois', p: Math.min(1, monthTrips / 30), c: GOLD },
-      { n: 'Brûleur de croissants', d: '10 000 kcal', p: Math.min(1, tot * kcalPerTrip() / 10000), c: RED },
+      { n: 'Centurion', d: '100 trajets', p: Math.min(1, all / 100), c: BLUE },
+      { n: 'Mois en or', d: '30 trajets dans le mois', p: Math.min(1, monthRides / 30), c: GOLD },
+      { n: 'Brûleur de croissants', d: '10 000 kcal', p: Math.min(1, kcalLow / 10000), c: RED },
       { n: 'Tirelire de 200 €', d: '200 € économisés', p: Math.min(1, saved / 200), c: GOLD },
       { n: 'Infatigable', d: '20 jours de suite', p: Math.min(1, bs / 20), c: BLUE },
       { n: 'Forêt urbaine', d: '250 kg de CO₂ évités', p: Math.min(1, co2kg / 250), c: MINT }
@@ -179,6 +218,7 @@
     const name = st.profile.name.trim();
     return name ? `${hello}, ${name} !` : `${hello} !`;
   }
+  const tripLine = t => `${fmtKm(t.km)} · ${t.min} min${t.dur === 'chrono' ? ' (chrono)' : ''}${t.tram ? '' : ' · hors tram'}`;
   function renderHome() {
     $('today-label').textContent = today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
     $('greeting').textContent = greeting();
@@ -191,30 +231,40 @@
     $('hero-goal-r').textContent = fmtE(st.goalM, 0);
 
     const dT = trips(today), wT = sumRange(monday, today), aT = allTrips();
-    $('t-day').textContent = fmtE(money(dT)); $('t-day-s').textContent = plural(dT, 'trajet');
-    $('t-week').textContent = fmtE(money(wT)); $('t-week-s').textContent = plural(wT, 'trajet');
-    $('t-all').textContent = fmtE(money(aT), 0); $('t-all-s').textContent = plural(aT, 'trajet');
-    $('m-min').textContent = (wT * st.min) + ' min';
-    $('m-co2').textContent = fmtKg(aT * st.km * G.car);
+    $('t-day').textContent = fmtE(money(dT)); $('t-day-s').textContent = plural(dT, 'ticket') + ' évité' + (dT > 1 ? 's' : '');
+    $('t-week').textContent = fmtE(money(wT)); $('t-week-s').textContent = plural(wT, 'ticket') + ' évité' + (wT > 1 ? 's' : '');
+    $('t-all').textContent = fmtE(money(aT), 0); $('t-all-s').textContent = plural(aT, 'ticket') + ' évité' + (aT > 1 ? 's' : '');
+    $('m-min').textContent = tripsIn(monday, today).reduce((a, t) => a + t.min, 0) + ' min';
+    $('m-co2').textContent = fmtKg(st.trips.reduce((a, t) => a + t.km, 0) * G.car);
 
-    $('add1-p').textContent = '+' + fmtE(st.price);
-    $('add2-p').textContent = '+' + fmtE(st.price * 2);
-    $('today-trips').textContent = plural(dT, 'trajet') + " aujourd'hui";
-    $('undo').disabled = !st.log.length;
-    $('log-hint').textContent = 'Un trajet à vélo = un ticket à ' + fmtE(st.price) + ' en moins.';
+    // Chrono
+    const run = !!st.chrono;
+    $('chrono-run').hidden = !run; $('chrono-start').hidden = run; $('fav-chips').hidden = run; $('log-hint').hidden = run;
+    tickChrono();
+
+    // Trajets favoris : un geste pour ajouter
+    $('fav-chips').innerHTML = st.favs.map(f => `<button class="fav" data-fav="${esc(f.id)}"><b>${esc(f.name)}</b><span class="num">${fmtKm(f.km)} · ${f.min} min${f.tram ? ' · +' + fmtE(st.price) : ''}</span></button>`).join('')
+      + '<button class="fav other" id="fav-other"><b>+ Autre</b><span>trajet ponctuel</span></button>';
+    $('fav-chips').querySelectorAll('[data-fav]').forEach(b => b.onclick = () => quickAdd(b.dataset.fav, b));
+    $('fav-other').onclick = () => openTripSheet({});
+    const nToday = rides(today);
+    $('today-trips').textContent = plural(nToday, 'trajet') + " aujourd'hui";
+    $('undo').disabled = !st.undo.length;
 
     $('week').innerHTML = DAYS.map((l, i) => {
-      const d = addDays(monday, i), n = trips(d), fut = d > today, k = key(d);
+      const d = addDays(monday, i), n = rides(d), fut = d > today, k = key(d);
       return `<button class="day" data-day="${k}" ${fut ? 'disabled' : ''} aria-label="${l} : ${n} trajet(s)"><span class="dot ${n ? 'on' : ''} ${i === dow(today) ? 'today' : ''} ${selDay === k ? 'sel' : ''}">${fut ? '' : (n || '–')}</span>${l}</button>`;
     }).join('');
     $('week').querySelectorAll('[data-day]').forEach(b => b.onclick = () => { selDay = selDay === b.dataset.day ? null : b.dataset.day; renderHome(); });
-    const de = $('dayedit');
+    const dp = $('daypanel');
     if (selDay) {
-      const [y, m, dd] = selDay.split('-').map(Number), d = new Date(y, m - 1, dd, 12);
-      de.hidden = false;
-      $('de-title').textContent = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-      $('de-val').textContent = st.hist[selDay] || 0;
-    } else de.hidden = true;
+      const [y, m, dd] = selDay.split('-').map(Number), d = new Date(y, m - 1, dd, 12), list = dayList(selDay);
+      dp.hidden = false;
+      dp.innerHTML = `<div class="dp-h"><b>${d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</b><button class="link" id="dp-add">+ Ajouter</button></div>`
+        + (list.length ? list.map(t => `<div class="trow"><div><b>${esc(t.name)}</b><span class="num">${tripLine(t)}</span></div><button class="x" data-del="${t.id}" aria-label="Supprimer ce trajet">✕</button></div>`).join('') : '<p class="note" style="text-align:left;margin:0">Aucun trajet ce jour-là.</p>');
+      $('dp-add').onclick = () => openTripSheet({ k: selDay });
+      dp.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { st.trips = st.trips.filter(t => t.id !== b.dataset.del); save(); renderAll(); toast('<span>Trajet supprimé</span>'); });
+    } else dp.hidden = true;
 
     const next = badges().filter(b => b.p < 1).sort((a, b) => b.p - a.p)[0];
     $('teaser').innerHTML = next
@@ -304,24 +354,37 @@
   function renderImpact() {
     document.querySelectorAll('#iseg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.ip === iperiod));
     const from = iperiod === 'week' ? monday : iperiod === 'month' ? monthStart() : firstDay();
-    const t = sumRange(from, today), mins = t * st.min, kcal = t * kcalPerTrip(), km = t * st.km;
-    const wMin = sumRange(monday, today) * st.min;
-    let wDays = 0; for (let d = new Date(monday); d <= today; d = addDays(d, 1)) if (trips(d)) wDays++;
+    const list = tripsIn(from, today), weekList = tripsIn(monday, today);
+    const mins = list.reduce((a, t) => a + t.min, 0), km = list.reduce((a, t) => a + t.km, 0), kcal = kcalRange(list);
+    const wMin = weekList.reduce((a, t) => a + t.min, 0);
+    let wDays = 0; for (let d = new Date(monday); d <= today; d = addDays(d, 1)) if (rides(d)) wDays++;
 
     $('ring-fg').style.strokeDashoffset = 314.16 * (1 - Math.min(1, wMin / 150));
     $('ring-n').textContent = wMin;
     $('ring-t').textContent = wMin >= 150 ? 'Objectif OMS atteint cette semaine' : 'Encore ' + (150 - wMin) + ' min cette semaine';
     $('h-time').textContent = fmtDur(mins);
-    $('h-kcal').textContent = Math.round(kcal).toLocaleString('fr-FR');
-    $('h-km').textContent = km.toLocaleString('fr-FR') + ' km';
+    $('h-kcal').textContent = fmtKcal(kcal);
+    $('h-km').textContent = fmtKm(km);
 
+    const kMid = (kcal[0] + kcal[1]) / 2, cr = kMid / 230;
     const fx = [
       { on: wMin >= 150, t: wMin >= 150 ? "Vous atteignez les 150 minutes hebdomadaires conseillées par l'OMS." : 'À ' + (150 - wMin) + " minutes des 150 min hebdomadaires conseillées par l'OMS." },
       { on: wDays >= 3, t: wDays >= 3 ? wDays + ' jours actifs cette semaine : votre cœur et votre souffle travaillent régulièrement.' : 'Pédalez au moins 3 jours par semaine pour un effet régulier sur le cœur (' + wDays + " pour l'instant)." },
-      { on: kcal >= 230, t: Math.round(kcal).toLocaleString('fr-FR') + " kcal dépensées, l'équivalent de " + (kcal / 230).toLocaleString('fr-FR', { maximumFractionDigits: kcal < 2300 ? 1 : 0 }) + ' croissant' + (kcal >= 460 ? 's' : '') + '.' },
-      { on: t > 0, t: 'Une activité physique régulière aide à mieux dormir et à réduire le stress.' }
+      { on: kMid >= 230, t: fmtKcal(kcal) + " kcal dépensées, l'équivalent " + (st.profile.kg ? 'de ' : "d'environ ") + cr.toLocaleString('fr-FR', { maximumFractionDigits: cr < 10 ? 1 : 0 }) + ' croissant' + (cr >= 2 ? 's' : '') + '.' },
+      { on: list.length > 0, t: 'Une activité physique régulière aide à mieux dormir et à réduire le stress.' }
     ];
     $('effects').innerHTML = fx.map(f => `<li class="${f.on ? '' : 'off'}"><i></i><span>${f.t}</span></li>`).join('');
+
+    // Fiabilité des chiffres
+    const n = list.length, timed = list.filter(t => t.dur === 'chrono' || t.dur === 'manuel').length;
+    const kgOk = !!st.profile.kg;
+    const rel = [
+      { ok: kgOk, t: kgOk ? `Poids renseigné (${st.profile.kg} kg) : calories calculées pour vous.` : 'Poids non renseigné : les calories sont une fourchette (55 à 85 kg).', act: kgOk ? '' : '<button class="link" data-go="reglages">Ajouter</button>' },
+      { ok: n && timed / n >= .5, t: n ? `${Math.round(timed / n * 100)} % des durées mesurées au chrono ou saisies, les autres viennent de vos favoris.` : 'Lancez le chrono pour mesurer vos durées réelles.' },
+      { ok: true, t: 'Distances issues de vos favoris, de la carte ou de votre saisie.' }
+    ];
+    $('reliab').innerHTML = '<b>Fiabilité des chiffres</b>' + rel.map(r => `<div class="rel ${r.ok ? 'ok' : ''}"><i></i><span>${r.t}</span>${r.act || ''}</div>`).join('');
+    $('reliab').querySelectorAll('[data-go]').forEach(b => b.onclick = () => { go('reglages'); setTimeout(() => $('p-kg').focus(), 50); });
 
     const tk = key(today), cur = st.mood[tk];
     $('mood').innerHTML = MOODS.map((m, i) => `<button data-m="${i}" aria-pressed="${cur === i}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/>${m.f}</svg>${m.l}</button>`).join('');
@@ -330,15 +393,15 @@
       toast('<span>Ressenti enregistré : <b>' + MOODS[b.dataset.m].l + '</b></span>');
     });
     let pos = 0, all = 0;
-    for (let d = new Date(from); d <= today; d = addDays(d, 1)) { const v = st.mood[key(d)]; if (v !== undefined && trips(d)) { all++; if (v <= 1) pos++; } }
-    $('mood-s').textContent = all ? `Sur la période, votre ressenti était positif après ${pos} trajet${pos > 1 ? 's' : ''} sur ${all} (${Math.round(pos / all * 100)} %).` : "Notez votre ressenti pour voir l'effet du vélo sur votre humeur.";
+    for (let d = new Date(from); d <= today; d = addDays(d, 1)) { const v = st.mood[key(d)]; if (v !== undefined && rides(d)) { all++; if (v <= 1) pos++; } }
+    $('mood-s').textContent = all ? `Sur la période, votre ressenti était positif après ${pos} jour${pos > 1 ? 's' : ''} de vélo sur ${all} (${Math.round(pos / all * 100)} %).` : "Notez votre ressenti pour voir l'effet du vélo sur votre humeur.";
 
     const car = km * G.car, tram = km * G.tram, bus = km * G.bus, mx = Math.max(car, 1);
     $('e-car').innerHTML = fmtKg(car).replace(/ (k?g)$/, '<small> $1</small>');
     $('e-vs').innerHTML = [['Voiture', car, 'var(--warn)'], ['Bus', bus, 'var(--gold)'], ['Tram', tram, 'var(--rail)'], ['Vélo', 0, 'var(--eco)']]
       .map(([l, v, c]) => `<div class="r"><span>${l}</span><div class="bar2"><i style="width:${Math.max(v / mx * 100, v ? 2 : 0)}%;background:${c}"></i></div><b class="num">${fmtKg(v)}</b></div>`).join('');
     $('e-tram').textContent = fmtKg(tram);
-    $('e-km').textContent = km.toLocaleString('fr-FR');
+    $('e-km').textContent = km.toLocaleString('fr-FR', { maximumFractionDigits: 1 });
     $('e-fuel').textContent = (km * 0.065).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' L';
   }
 
@@ -376,15 +439,15 @@
     document.querySelectorAll('#modes button').forEach(b => b.setAttribute('aria-checked', b.dataset.mode === st.profile.mode));
   }
   function renderSettings() {
-    const nameEl = $('p-name');
+    const nameEl = $('p-name'), kgEl = $('p-kg');
     if (document.activeElement !== nameEl) nameEl.value = st.profile.name;
+    if (document.activeElement !== kgEl) kgEl.value = st.profile.kg || '';
     $('avatar').textContent = (st.profile.name.trim()[0] || '?').toUpperCase();
     document.querySelectorAll('#s-price .opt').forEach(o => o.setAttribute('aria-checked', Number(o.dataset.price) === st.price));
     $('v-goalM').textContent = st.goalM + ' €';
     $('v-goalW').textContent = st.goalW;
-    $('v-min').textContent = st.min + ' min';
-    $('v-km').textContent = st.km + ' km';
-    $('v-kg').textContent = st.kg + ' kg';
+    $('favlist').innerHTML = st.favs.map(f => `<div class="trow"><div><b>${esc(f.name)}</b><span class="num">${fmtKm(f.km)} · ${f.min} min · ${f.tram ? 'remplace un ticket de tram' : 'ne remplace pas le tram'}</span></div><button class="link" data-edit="${esc(f.id)}">Modifier</button></div>`).join('');
+    $('favlist').querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openFavSheet(b.dataset.edit));
     renderSwatches();
   }
 
@@ -400,7 +463,7 @@
 
   // ---------- Toast et pièces ----------
   let toastT;
-  function toast(html) { const t = $('toast'); t.innerHTML = html; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+  function toast(html, ms = 2600) { const t = $('toast'); t.innerHTML = html; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), ms); }
   function coins(btn, n) {
     const app = $('app'), ph = app.getBoundingClientRect(), r = btn.getBoundingClientRect();
     for (let i = 0; i < n * 3; i++) {
@@ -414,33 +477,195 @@
   }
 
   // ---------- Saisie de trajets ----------
-  function add(n, btn) {
-    refreshToday();
-    const before = level().lv, bBefore = badges().filter(b => b.p >= 1).length;
-    const k = key(today); st.hist[k] = (st.hist[k] || 0) + n; st.log.push({ k, n }); if (st.log.length > 50) st.log.shift(); save();
-    coins(btn, n);
-    const L = level(), won = badges().filter(b => b.p >= 1);
-    let msg = `<span>+<b>${fmtE(money(n))}</b> gardés dans votre tirelire. +${n * 10} XP</span>`;
-    if (L.lv > before) msg = `<span>Niveau ${L.lv} atteint : <b>${L.name}</b> !</span>`;
-    else if (won.length > bBefore) msg = `<span>Nouveau badge : <b>${won[won.length - 1].n}</b></span>`;
-    toast(msg); renderAll();
+  function celebrate(added, btn) {
+    const before = { lv: level().lv, b: badges().filter(b => b.p >= 1).length };
+    return () => {
+      const tramN = added.filter(t => t.tram).length;
+      if (btn && tramN) coins(btn, tramN);
+      const L = level(), won = badges().filter(b => b.p >= 1);
+      if (L.lv > before.lv) return `<span>Niveau ${L.lv} atteint : <b>${L.name}</b> !</span>`;
+      if (won.length > before.b) return `<span>Nouveau badge : <b>${won[won.length - 1].n}</b></span>`;
+      return tramN ? `<span>+<b>${fmtE(money(tramN))}</b> gardés · +${added.length * 10} XP</span>` : `<span>Trajet ajouté · +${added.length * 10} XP</span>`;
+    };
+  }
+  function addTrips(list, btn) {
+    const fin = celebrate(list, btn);
+    st.trips.push(...list); st.undo.push(list.map(t => t.id)); if (st.undo.length > 30) st.undo.shift();
+    save(); const msg = fin(); renderAll();
     if (navigator.vibrate) try { navigator.vibrate(30); } catch (e) { /* ignoré */ }
+    return msg;
   }
-  $('add1').addEventListener('click', e => add(1, e.currentTarget));
-  $('add2').addEventListener('click', e => add(2, e.currentTarget));
+  const mkTrip = (o) => ({ id: uid(), k: o.k || key(today), km: o.km, min: o.min, fav: o.fav || null, name: o.name, tram: o.tram, dur: o.dur, dist: o.dist });
+  function quickAdd(favId, btn) {
+    refreshToday();
+    const f = st.favs.find(x => x.id === favId); if (!f) return;
+    const t = mkTrip({ km: f.km, min: f.min, fav: f.id, name: f.name, tram: f.tram, dur: 'favori', dist: 'favori' });
+    const msg = addTrips([t], btn);
+    toast(msg + '<button class="tbtn" id="t-back">+ le retour</button>', 4000);
+    const back = $('t-back');
+    if (back) back.onclick = () => { $('toast').classList.remove('show'); toast(addTrips([{ ...t, id: uid() }], btn)); };
+  }
   $('undo').addEventListener('click', () => {
-    const last = st.log.pop(); if (!last) return;
-    st.hist[last.k] = Math.max(0, (st.hist[last.k] || 0) - last.n); if (!st.hist[last.k]) delete st.hist[last.k];
-    save(); toast('<span>Dernier trajet annulé</span>'); renderAll();
+    const ids = st.undo.pop(); if (!ids) return;
+    st.trips = st.trips.filter(t => !ids.includes(t.id));
+    save(); toast('<span>Dernier ajout annulé</span>'); renderAll();
   });
-  function editDay(delta) {
-    if (!selDay) return;
-    const v = Math.max(0, Math.min(10, (st.hist[selDay] || 0) + delta));
-    if (v) st.hist[selDay] = v; else delete st.hist[selDay];
-    save(); renderAll();
+
+  // ---------- Chrono ----------
+  let chronoT = null;
+  const fmtClock = ms => { const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s % 60).padStart(2, '0'); };
+  function tickChrono() {
+    clearInterval(chronoT);
+    if (!st.chrono) return;
+    const up = () => { $('chrono-time').textContent = fmtClock(Date.now() - st.chrono); };
+    up(); chronoT = setInterval(up, 1000);
   }
-  $('de-minus').onclick = () => editDay(-1);
-  $('de-plus').onclick = () => editDay(1);
+  $('chrono-start').onclick = () => { st.chrono = Date.now(); save(); renderHome(); toast('<span>Chrono lancé. Bonne route !</span>'); };
+  $('chrono-cancel').onclick = () => { st.chrono = null; save(); renderHome(); };
+  $('chrono-stop').onclick = () => {
+    const min = Math.max(1, Math.round((Date.now() - st.chrono) / 60000));
+    st.chrono = null; save(); renderHome();
+    openTripSheet({ min, dur: 'chrono' });
+  };
+
+  // ---------- Feuilles (ajout de trajet, favori, carte) ----------
+  let sheetBack = null;
+  function openSheet(html) {
+    $('sheet').innerHTML = html; $('sheet').hidden = false; $('sheet-bg').hidden = false;
+    const f = $('sheet').querySelector('input:not([type=checkbox])'); if (f && !('ontouchstart' in window)) setTimeout(() => f.focus(), 50);
+  }
+  function closeSheet() { $('sheet').hidden = true; $('sheet-bg').hidden = true; $('sheet').innerHTML = ''; if (map) { map.remove(); map = null; } }
+  $('sheet-bg').onclick = closeSheet;
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('sheet').hidden) closeSheet(); });
+  const num = v => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : NaN; };
+  const toggle = (id, label, on, sub) => `<label class="tog"><span><b>${label}</b>${sub ? `<span>${sub}</span>` : ''}</span><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><i></i></label>`;
+
+  // Ajout d'un trajet : favori ou « Autre »
+  function openTripSheet(o) {
+    const k = o.k || key(today);
+    const [y, m, dd] = k.split('-').map(Number), d = new Date(y, m - 1, dd, 12);
+    const dayTxt = k === key(today) ? "Aujourd'hui" : d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+    const s = { fav: o.fav === undefined ? (o.dur === 'chrono' ? st.favs[0]?.id : null) : o.fav, km: o.km, min: o.min, dur: o.dur || null, dist: o.dist || null, rt: false };
+    const draw = () => {
+      const f = st.favs.find(x => x.id === s.fav);
+      const km = s.km ?? (f ? f.km : ''), min = s.min ?? (f ? f.min : '');
+      const tram = s.tram ?? (f ? f.tram : true);
+      openSheet(`<div class="sh-h"><div><b>Ajouter un trajet</b><span>${dayTxt}</span></div><button class="x" id="sh-close" aria-label="Fermer">✕</button></div>
+        <div class="pick">${st.favs.map(x => `<button class="pk" data-f="${esc(x.id)}" aria-pressed="${s.fav === x.id}">${esc(x.name)}</button>`).join('')}<button class="pk" data-f="" aria-pressed="${!s.fav}">Autre</button></div>
+        ${!f ? `<div class="field"><label for="sh-name">Nom du trajet</label><input id="sh-name" maxlength="30" placeholder="Ex. : chez Léa, piscine…" value="${esc(s.name || '')}"></div>` : ''}
+        <div class="two">
+          <div class="field"><label for="sh-km">Distance (km)</label><input id="sh-km" inputmode="decimal" value="${km === '' ? '' : String(km).replace('.', ',')}" placeholder="ex. 4,5">${!f ? '<button type="button" class="link" id="sh-map">Tracer sur la carte</button>' : (s.dist === 'carte' ? '<span class="hint">Mesurée sur la carte</span>' : '')}</div>
+          <div class="field"><label for="sh-min">Durée (min)</label><input id="sh-min" inputmode="numeric" value="${min}" placeholder="ex. 18"><span class="hint">${s.dur === 'chrono' ? 'Mesurée au chrono' : 'Modifiable si besoin'}</span></div>
+        </div>
+        ${toggle('sh-tram', 'Remplace un ticket de tram', tram, "Sinon le trajet compte pour la santé et le CO₂, pas pour l'argent")}
+        ${toggle('sh-rt', 'Aller-retour', s.rt, 'Ajoute deux trajets identiques')}
+        ${!f ? toggle('sh-save', 'Garder dans mes favoris', false, '') : ''}
+        <p class="err" id="sh-err" hidden></p>
+        <button class="btn primary wide" id="sh-ok">Ajouter</button>`);
+      const keep = () => { s.km = $('sh-km').value === '' ? undefined : num($('sh-km').value); s.min = $('sh-min').value === '' ? undefined : num($('sh-min').value); s.tram = $('sh-tram').checked; s.rt = $('sh-rt').checked; if ($('sh-name')) s.name = $('sh-name').value; };
+      $('sh-close').onclick = closeSheet;
+      $('sheet').querySelectorAll('[data-f]').forEach(b => b.onclick = () => {
+        keep(); s.fav = b.dataset.f || null; s.km = undefined; s.tram = undefined; s.dist = null; if (s.dur !== 'chrono') s.min = undefined; draw();
+      });
+      $('sh-km').oninput = () => { s.dist = 'saisie'; };
+      $('sh-min').oninput = () => { if (s.dur !== 'chrono') s.dur = 'manuel'; };
+      if ($('sh-map')) $('sh-map').onclick = () => { keep(); openMap(km2 => { s.km = km2; s.dist = 'carte'; draw(); }, draw); };
+      $('sh-ok').onclick = () => {
+        keep();
+        const kmV = s.km, minV = s.min, err = $('sh-err');
+        if (!(kmV > 0 && kmV <= 300)) { err.textContent = kmV > 300 ? 'Distance trop grande : 300 km maximum par trajet.' : 'Indiquez une distance en kilomètres (par exemple 4,5).'; err.hidden = false; return; }
+        if (!(minV > 0 && minV <= 600)) { err.textContent = 'Indiquez une durée en minutes (par exemple 18).'; err.hidden = false; return; }
+        let fav = f, name = f ? f.name : (s.name || '').trim() || 'Trajet';
+        if (!f && $('sh-save') && $('sh-save').checked) { fav = { id: uid(), name, km: Math.round(kmV * 10) / 10, min: Math.round(minV), tram: s.tram }; st.favs.push(fav); }
+        const dur = s.dur || (f && minV === f.min ? 'favori' : 'manuel');
+        const dist = s.dist || (f && kmV === f.km ? 'favori' : 'saisie');
+        const base = { k, km: Math.round(kmV * 10) / 10, min: Math.round(minV), fav: fav ? fav.id : null, name, tram: s.tram, dur, dist };
+        const list = [mkTrip(base)]; if (s.rt) list.push(mkTrip(base));
+        closeSheet();
+        toast(addTrips(list, $('fav-chips')));
+      };
+    };
+    draw();
+  }
+
+  // Favori : création et modification
+  function openFavSheet(id) {
+    const f = st.favs.find(x => x.id === id);
+    const s = f ? { ...f } : { id: uid(), name: '', km: undefined, min: undefined, tram: true };
+    const draw = () => {
+      openSheet(`<div class="sh-h"><div><b>${f ? 'Modifier le trajet' : 'Nouveau trajet favori'}</b><span>Ces valeurs servent à chaque ajout en un geste</span></div><button class="x" id="sh-close" aria-label="Fermer">✕</button></div>
+        <div class="field"><label for="fv-name">Nom</label><input id="fv-name" maxlength="30" placeholder="Ex. : Boulot, Sport, Courses" value="${esc(s.name)}"></div>
+        <div class="two">
+          <div class="field"><label for="fv-km">Distance (km)</label><input id="fv-km" inputmode="decimal" value="${s.km === undefined ? '' : String(s.km).replace('.', ',')}"><button type="button" class="link" id="fv-map">Tracer sur la carte</button></div>
+          <div class="field"><label for="fv-min">Durée (min)</label><input id="fv-min" inputmode="numeric" value="${s.min ?? ''}"><span class="hint">Astuce : chronométrez-le une fois</span></div>
+        </div>
+        ${toggle('fv-tram', 'Remplace un ticket de tram', s.tram, 'Décochez pour le sport ou une balade')}
+        <p class="err" id="sh-err" hidden></p>
+        <button class="btn primary wide" id="fv-ok">Enregistrer</button>
+        ${f && st.favs.length > 1 ? '<button class="link danger" id="fv-del" style="margin:auto">Supprimer ce favori</button>' : ''}`);
+      const keep = () => { s.name = $('fv-name').value; s.km = num($('fv-km').value); s.min = num($('fv-min').value); s.tram = $('fv-tram').checked; };
+      $('sh-close').onclick = closeSheet;
+      $('fv-map').onclick = () => { keep(); openMap(km => { s.km = km; draw(); }, draw); };
+      $('fv-ok').onclick = () => {
+        keep(); const err = $('sh-err');
+        if (!s.name.trim()) { err.textContent = 'Donnez un nom à ce trajet.'; err.hidden = false; return; }
+        if (!(s.km > 0 && s.km <= 300)) { err.textContent = 'Indiquez une distance en kilomètres.'; err.hidden = false; return; }
+        if (!(s.min > 0 && s.min <= 600)) { err.textContent = 'Indiquez une durée en minutes.'; err.hidden = false; return; }
+        const v = { id: s.id, name: s.name.trim().slice(0, 30), km: Math.round(s.km * 10) / 10, min: Math.round(s.min), tram: s.tram };
+        if (f) Object.assign(f, v); else st.favs.push(v);
+        save(); closeSheet(); renderAll(); toast(`<span>Trajet <b>${esc(v.name)}</b> enregistré</span>`);
+      };
+      if ($('fv-del')) $('fv-del').onclick = () => { st.favs = st.favs.filter(x => x.id !== f.id); save(); closeSheet(); renderAll(); toast('<span>Favori supprimé. Les trajets déjà faits sont gardés.</span>'); };
+    };
+    draw();
+  }
+  $('fav-add').onclick = () => openFavSheet(null);
+
+  // Carte : départ et arrivée, distance ≈ vol d'oiseau × 1,3
+  let map = null;
+  function haversine(a, b) {
+    const R = 6371, r = x => x * Math.PI / 180, dLa = r(b.lat - a.lat), dLo = r(b.lng - a.lng);
+    const h = Math.sin(dLa / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLo / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+  function openMap(onUse, onBack) {
+    if (!window.L) {
+      openSheet(`<div class="sh-h"><div><b>Carte indisponible</b><span>Vérifiez votre connexion internet</span></div></div><p>Vous pouvez saisir la distance à la main.</p><button class="btn ghost wide" id="mp-back">Retour</button>`);
+      $('mp-back').onclick = onBack; return;
+    }
+    openSheet(`<div class="sh-h"><div><b>Tracer le trajet</b><span id="mp-step">Touchez le point de départ</span></div><button class="x" id="mp-x" aria-label="Retour">✕</button></div>
+      <div class="map" id="map"></div>
+      <div class="mp-bar"><button class="link" id="mp-me">Ma position</button><button class="link" id="mp-reset">Recommencer</button></div>
+      <p class="mp-res num" id="mp-res">Distance : —</p>
+      <p class="hint">Distance à vol d'oiseau × 1,3 pour tenir compte des rues : une bonne estimation en ville.</p>
+      <button class="btn primary wide" id="mp-ok" disabled>Utiliser cette distance</button>`);
+    map = L.map('map', { zoomControl: true, attributionControl: true }).setView(st.mapCenter || [46.6, 2.4], st.mapCenter ? 13 : 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+    const pts = [], marks = []; let line = null, km = 0;
+    const update = () => {
+      $('mp-step').textContent = pts.length === 0 ? 'Touchez le point de départ' : pts.length === 1 ? "Touchez le point d'arrivée" : 'Départ et arrivée placés';
+      if (pts.length === 2) {
+        km = Math.round(haversine(pts[0], pts[1]) * DETOUR * 10) / 10;
+        $('mp-res').textContent = 'Distance : ≈ ' + fmtKm(km); $('mp-ok').disabled = !(km > 0);
+      } else { $('mp-res').textContent = 'Distance : —'; $('mp-ok').disabled = true; }
+    };
+    map.on('click', e => {
+      if (pts.length >= 2) return;
+      pts.push(e.latlng);
+      marks.push(L.circleMarker(e.latlng, { radius: 9, color: '#fff', weight: 3, fillColor: pts.length === 1 ? '#14A37F' : '#FF5A5F', fillOpacity: 1 }).addTo(map));
+      if (pts.length === 2) line = L.polyline(pts, { color: getComputedStyle(document.documentElement).getPropertyValue('--rail').trim() || '#213BCA', weight: 4, dashArray: '6 8' }).addTo(map);
+      update();
+    });
+    $('mp-reset').onclick = () => { pts.length = 0; marks.forEach(m => m.remove()); marks.length = 0; if (line) line.remove(); line = null; update(); };
+    $('mp-me').onclick = () => {
+      if (!navigator.geolocation) { toast("<span>Position indisponible sur cet appareil</span>"); return; }
+      navigator.geolocation.getCurrentPosition(p => map.setView([p.coords.latitude, p.coords.longitude], 15), () => toast('<span>Position refusée ou indisponible</span>'), { timeout: 8000 });
+    };
+    $('mp-x').onclick = () => { map.remove(); map = null; onBack(); };
+    $('mp-ok').onclick = () => { const c = map.getCenter(); st.mapCenter = [c.lat, c.lng]; save(); map.remove(); map = null; onUse(km); };
+    setTimeout(() => map && map.invalidateSize(), 60);
+    if (!st.mapCenter && navigator.geolocation) navigator.geolocation.getCurrentPosition(p => map && map.setView([p.coords.latitude, p.coords.longitude], 14), () => {}, { timeout: 8000 });
+  }
 
   // ---------- Stats / impact ----------
   document.querySelectorAll('#pseg button').forEach(b => b.addEventListener('click', () => { period = b.dataset.p; renderStats(); }));
@@ -448,11 +673,16 @@
 
   // ---------- Réglages ----------
   $('p-name').addEventListener('input', e => { st.profile.name = e.target.value.slice(0, 30); save(); renderHome(); $('avatar').textContent = (st.profile.name.trim()[0] || '?').toUpperCase(); });
+  $('p-kg').addEventListener('change', e => {
+    const v = num(e.target.value);
+    st.profile.kg = v >= 30 && v <= 200 ? Math.round(v) : null; save(); renderAll();
+    toast(st.profile.kg ? `<span>Poids enregistré : <b>${st.profile.kg} kg</b></span>` : '<span>Poids retiré : les calories seront une fourchette</span>');
+  });
   document.querySelectorAll('#s-price .opt').forEach(o => o.addEventListener('click', () => {
     st.price = Number(o.dataset.price); save(); renderAll();
     toast(`<span>Prix de référence : <b>${fmtE(st.price)}</b> par trajet</span>`);
   }));
-  const LIMITS = { goalM: [10, 300], goalW: [1, 30], min: [5, 120], km: [1, 40], kg: [30, 180] };
+  const LIMITS = { goalM: [10, 300], goalW: [1, 30] };
   document.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => {
     const [f, d] = b.dataset.step.split(':'), [lo, hi] = LIMITS[f];
     st[f] = Math.min(hi, Math.max(lo, st[f] + Number(d))); save(); renderAll();
@@ -470,20 +700,21 @@
     r.onload = () => {
       try {
         const d = JSON.parse(r.result);
-        if (!d || typeof d.hist !== 'object') throw new Error('format');
-        const base = defaults(); st = { ...base, ...d, profile: { ...base.profile, ...(d.profile || {}) }, onboarded: true };
+        if (!d || (typeof d.hist !== 'object' && !Array.isArray(d.trips))) throw new Error('format');
+        st = migrate(d); st.onboarded = true;
         save(); applyTheme(); renderAll(); toast('<span>Données importées</span>');
       } catch (err) { toast("<span>Ce fichier n'est pas une sauvegarde VélOr.</span>"); }
       e.target.value = '';
     };
     r.readAsText(f);
   });
+  function loadSample() { const s = sample(); st.trips = s.trips; st.mood = s.mood; st.favs = s.favs; st.undo = []; }
   function resetZone() {
     $('reset-zone').innerHTML = '<button class="plain danger" id="reset">Effacer mes trajets</button>';
     $('reset').onclick = () => {
       $('reset-zone').innerHTML = '<div class="confirm"><span>Effacer tous les trajets ?</span><button class="yes" id="r-yes">Effacer</button><button class="no" id="r-no">Garder</button><button class="no" id="r-demo">Charger l\'exemple</button></div>';
-      $('r-yes').onclick = () => { st.hist = {}; st.mood = {}; st.log = []; save(); renderAll(); resetZone(); toast('<span>Compteurs remis à zéro</span>'); };
-      $('r-demo').onclick = () => { const s = sample(); st.hist = s.h; st.mood = s.m; st.log = []; save(); renderAll(); resetZone(); toast("<span>Données d'exemple chargées</span>"); };
+      $('r-yes').onclick = () => { st.trips = []; st.mood = {}; st.undo = []; save(); renderAll(); resetZone(); toast('<span>Compteurs remis à zéro</span>'); };
+      $('r-demo').onclick = () => { loadSample(); save(); renderAll(); resetZone(); toast("<span>Données d'exemple chargées</span>"); };
       $('r-no').onclick = resetZone;
     };
   }
@@ -499,8 +730,12 @@
   document.querySelectorAll('#w-price .opt').forEach(o => o.addEventListener('click', () => { wPrice = Number(o.dataset.price); renderWelcomePrice(); }));
   function finishWelcome(demo) {
     st.profile.name = $('w-name').value.trim().slice(0, 30);
+    const kg = num($('w-kg').value); st.profile.kg = kg >= 30 && kg <= 200 ? Math.round(kg) : null;
+    const km = num($('w-km').value), min = num($('w-min').value);
+    if (km > 0 && km <= 300) st.favs[0].km = Math.round(km * 10) / 10;
+    if (min > 0 && min <= 600) st.favs[0].min = Math.round(min);
     st.price = wPrice; st.onboarded = true;
-    if (demo) { const s = sample(); st.hist = s.h; st.mood = s.m; }
+    if (demo) loadSample();
     save(); $('welcome').hidden = true; renderAll();
     toast(st.profile.name ? `<span>Bienvenue, <b>${esc(st.profile.name)}</b> !</span>` : '<span>Bienvenue sur <b>VélOr</b> !</span>');
   }
