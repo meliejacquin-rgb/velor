@@ -15,6 +15,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -80,21 +81,20 @@
       </div>
 
       <div class="log">
-        <h3>J'ai pris le vélo</h3>
-        <p id="log-hint">Un trajet à vélo = un ticket de tram en moins.</p>
-        <div class="btns">
-          <button class="btn ghost" id="add1"><b>Aller simple</b><span class="num" id="add1-p">+1,90 €</span></button>
-          <button class="btn primary" id="add2"><b>Aller-retour</b><span class="num" id="add2-p">+3,80 €</span></button>
+        <div class="log-h"><h3>J'ai pris le vélo</h3><button class="chip-btn" id="chrono-start"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg>Chrono</button></div>
+        <div class="chrono-run" id="chrono-run" hidden>
+          <div><span>Trajet en cours</span><b class="num" id="chrono-time">0:00</b></div>
+          <button class="btn primary" id="chrono-stop"><b>Je suis arrivé</b></button>
+          <button class="link" id="chrono-cancel">Annuler</button>
         </div>
+        <p id="log-hint">Touchez un trajet pour l'ajouter.</p>
+        <div class="favs" id="fav-chips"></div>
         <div class="undo"><span id="today-trips">0 trajet aujourd'hui</span><button id="undo">Annuler le dernier</button></div>
       </div>
 
       <div class="section-h"><h3>Ma semaine</h3><button class="link" data-go="stats">Voir les stats</button></div>
       <div class="week" id="week"></div>
-      <div class="dayedit" id="dayedit" hidden>
-        <div><b id="de-title"></b><span>Un oubli ? Corrigez le nombre de trajets.</span></div>
-        <div class="stepper"><button id="de-minus" aria-label="Retirer un trajet">−</button><output class="num" id="de-val">0</output><button id="de-plus" aria-label="Ajouter un trajet">+</button></div>
-      </div>
+      <div class="daypanel" id="daypanel" hidden></div>
 
       <div class="section-h"><h3>Prochain badge</h3><button class="link" data-go="defis">Tous les défis</button></div>
       <div class="teaser" id="teaser"></div>
@@ -201,6 +201,10 @@
           <span class="hint">Utilisé pour vous accueillir sur l'écran d'accueil.</span>
         </div>
       </div>
+      <div class="setting">
+        <div class="t"><b>Mon poids</b><span>Pour calculer vos calories. Facultatif : sans lui, VélOr affiche une fourchette.</span></div>
+        <div class="kg-in"><input id="p-kg" type="number" inputmode="decimal" min="30" max="200" step="1" placeholder="—" aria-label="Poids en kilos"><span>kg</span></div>
+      </div>
       <div class="section-h"><h3>Couleurs de l'appli</h3></div>
       <div class="swatches" role="radiogroup" aria-label="Palette de couleurs" id="swatches"></div>
       <div class="modes" role="radiogroup" aria-label="Apparence" id="modes">
@@ -226,19 +230,9 @@
         <div class="t"><b>Objectif hebdomadaire</b><span>Nombre de trajets à vélo par semaine</span></div>
         <div class="stepper"><button data-step="goalW:-1" aria-label="Diminuer">−</button><output class="num" id="v-goalW"></output><button data-step="goalW:1" aria-label="Augmenter">+</button></div>
       </div>
-      <div class="section-h"><h3>Mon trajet type</h3></div>
-      <div class="setting">
-        <div class="t"><b>Durée d'un trajet</b><span>Sert au calcul des minutes d'activité</span></div>
-        <div class="stepper"><button data-step="min:-5" aria-label="Diminuer">−</button><output class="num" id="v-min"></output><button data-step="min:5" aria-label="Augmenter">+</button></div>
-      </div>
-      <div class="setting">
-        <div class="t"><b>Distance d'un trajet</b><span>Sert au calcul du CO₂ évité</span></div>
-        <div class="stepper"><button data-step="km:-1" aria-label="Diminuer">−</button><output class="num" id="v-km"></output><button data-step="km:1" aria-label="Augmenter">+</button></div>
-      </div>
-      <div class="setting">
-        <div class="t"><b>Mon poids</b><span>Sert au calcul des calories</span></div>
-        <div class="stepper"><button data-step="kg:-1" aria-label="Diminuer">−</button><output class="num" id="v-kg"></output><button data-step="kg:1" aria-label="Augmenter">+</button></div>
-      </div>
+      <div class="section-h"><h3>Mes trajets favoris</h3><button class="link" id="fav-add">+ Ajouter</button></div>
+      <p class="note" style="text-align:left;margin:0">Donnez la distance et la durée de vos trajets habituels. Un trajet qui ne remplace pas le tram (une balade, le sport) compte pour la santé et le CO₂, mais pas pour les économies.</p>
+      <div class="favlist" id="favlist"></div>
       <div class="section-h"><h3>Mes données</h3></div>
       <div class="actions">
         <button class="plain" id="export">Exporter (.json)</button>
@@ -250,6 +244,9 @@
     </section>
   </div>
 
+  <div class="sheet-bg" id="sheet-bg" hidden></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" hidden></div>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <nav class="tabs" aria-label="Navigation" id="tabs">
@@ -260,6 +257,7 @@
     <button data-go="reglages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>Réglages</button>
   </nav>
 </div>
-<script src="app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" defer></script>
+<script src="app.js" defer></script>
 </body>
 </html>
