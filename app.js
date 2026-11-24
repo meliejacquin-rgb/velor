@@ -235,7 +235,7 @@
     const dT = trips(today), wT = sumRange(monday, today), aT = allTrips();
     $('t-day').textContent = fmtE(money(dT)); $('t-day-s').textContent = plural(dT, 'ticket') + ' évité' + (dT > 1 ? 's' : '');
     $('t-week').textContent = fmtE(money(wT)); $('t-week-s').textContent = plural(wT, 'ticket') + ' évité' + (wT > 1 ? 's' : '');
-    $('t-all').textContent = fmtE(money(aT), 0); $('t-all-s').textContent = plural(aT, 'ticket') + ' évité' + (aT > 1 ? 's' : '');
+    $('t-all').textContent = fmtE(money(aT)); $('t-all-s').textContent = plural(aT, 'ticket') + ' évité' + (aT > 1 ? 's' : '');
     $('m-min').textContent = tripsIn(monday, today).reduce((a, t) => a + t.min, 0) + ' min';
     $('m-co2').textContent = fmtKg(st.trips.reduce((a, t) => a + t.km, 0) * G.car);
 
