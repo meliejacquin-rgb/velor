@@ -37,6 +37,8 @@
   const key = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
   const dow = d => (d.getDay() + 6) % 7; // 0 = lundi
+  // Nom du carnet santé du téléphone (appli native) : Apple Santé sur iPhone, Health Connect sur Android.
+  const HEALTH_NAME = () => (window.VelOrNative && window.VelOrNative.healthName) || 'Santé';
   let today, monday;
   function refreshToday() { today = new Date(); today.setHours(12, 0, 0, 0); monday = addDays(today, -dow(today)); }
   refreshToday();
@@ -218,7 +220,7 @@
     const name = st.profile.name.trim();
     return name ? `${hello}, ${name} !` : `${hello} !`;
   }
-  const tripLine = t => `${fmtKm(t.km)} · ${t.min} min${t.dur === 'chrono' ? ' (chrono)' : ''}${t.tram ? '' : ' · hors tram'}`;
+  const tripLine = t => `${fmtKm(t.km)} · ${t.min} min${t.dur === 'chrono' ? ' (chrono)' : t.dur === 'sante' ? ' (' + HEALTH_NAME() + ')' : ''}${t.tram ? '' : ' · hors tram'}`;
   function renderHome() {
     $('today-label').textContent = today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
     $('greeting').textContent = greeting();
@@ -376,12 +378,12 @@
     $('effects').innerHTML = fx.map(f => `<li class="${f.on ? '' : 'off'}"><i></i><span>${f.t}</span></li>`).join('');
 
     // Fiabilité des chiffres
-    const n = list.length, timed = list.filter(t => t.dur === 'chrono' || t.dur === 'manuel').length;
+    const n = list.length, timed = list.filter(t => t.dur === 'chrono' || t.dur === 'manuel' || t.dur === 'sante').length;
     const kgOk = !!st.profile.kg;
     const rel = [
       { ok: kgOk, t: kgOk ? `Poids renseigné (${st.profile.kg} kg) : calories calculées pour vous.` : 'Poids non renseigné : les calories sont une fourchette (55 à 85 kg).', act: kgOk ? '' : '<button class="link" data-go="reglages">Ajouter</button>' },
-      { ok: n && timed / n >= .5, t: n ? `${Math.round(timed / n * 100)} % des durées mesurées au chrono ou saisies, les autres viennent de vos favoris.` : 'Lancez le chrono pour mesurer vos durées réelles.' },
-      { ok: true, t: 'Distances issues de vos favoris, de la carte ou de votre saisie.' }
+      { ok: n && timed / n >= .5, t: n ? `${Math.round(timed / n * 100)} % des durées mesurées (chrono, montre ou saisie), les autres viennent de vos favoris.` : 'Lancez le chrono pour mesurer vos durées réelles.' },
+      { ok: true, t: 'Distances issues de vos favoris, de la carte, de votre saisie' + (list.some(t => t.dist === 'sante') ? ' ou de ' + HEALTH_NAME() : '') + '.' }
     ];
     $('reliab').innerHTML = '<b>Fiabilité des chiffres</b>' + rel.map(r => `<div class="rel ${r.ok ? 'ok' : ''}"><i></i><span>${r.t}</span>${r.act || ''}</div>`).join('');
     $('reliab').querySelectorAll('[data-go]').forEach(b => b.onclick = () => { go('reglages'); setTimeout(() => $('p-kg').focus(), 50); });
@@ -492,6 +494,7 @@
     const fin = celebrate(list, btn);
     st.trips.push(...list); st.undo.push(list.map(t => t.id)); if (st.undo.length > 30) st.undo.shift();
     save(); const msg = fin(); renderAll();
+    if (window.VelOrNative) window.VelOrNative.onTripsAdded(list);
     if (navigator.vibrate) try { navigator.vibrate(30); } catch (e) { /* ignoré */ }
     return msg;
   }
@@ -742,13 +745,25 @@
   $('welcome-form').addEventListener('submit', e => { e.preventDefault(); finishWelcome(false); });
   $('w-demo').addEventListener('click', () => finishWelcome(true));
 
+  // ---------- Pont vers l'appli native (native.js) ----------
+  // native.js ne fait rien dans le navigateur ; dans l'appli iPhone/Android il s'en sert
+  // pour importer les sorties vélo d'Apple Santé / Health Connect.
+  window.VelOr = {
+    state: () => st, save, renderAll, toast, openSheet, closeSheet, toggle, esc, fmtKm, fmtE, key, uid, mkTrip, money,
+    addTrips: list => addTrips(list, $('fav-chips'))
+  };
+
   // ---------- Démarrage ----------
   applyTheme();
   if (!st.onboarded) { $('welcome').hidden = false; renderWelcomePrice(); renderWelcomeThemes(); }
   renderAll();
   document.addEventListener('visibilitychange', () => { if (!document.hidden) renderAll(); });
 
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  // Pas de service worker dans l'appli native : les fichiers sont déjà dans l'appli.
+  const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  // Sur un téléphone Android, dans le navigateur : proposer l'appli native (gratuite, hors Play Store).
+  if (!isNative && /Android/i.test(navigator.userAgent)) { $('get-android').hidden = false; $('get-android').style.display = 'contents'; }
+  if (!isNative && 'serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
   }
 })();
