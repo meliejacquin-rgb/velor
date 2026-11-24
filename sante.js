@@ -102,7 +102,6 @@
 
   // ---------- Version web sur iPhone : import via Raccourcis ----------
   const native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-  const apple = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
   const CFG_KEY = 'velor-raccourci-v1';
   const cfg = Object.assign({ used: false, seen: [] }, (() => { try { return JSON.parse(localStorage.getItem(CFG_KEY)) || {}; } catch (e) { return {}; } })());
   const store = () => { try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch (e) { /* ignoré */ } };
@@ -159,9 +158,9 @@
     $('rc-done').onclick = V.closeSheet;
   }
 
-  // Boutons : dans les Réglages (iPhone, iPad, Mac) et sur l'accueil une fois le Raccourci utilisé.
+  // Boutons : dans les Réglages (version web) et sur l'accueil une fois le Raccourci utilisé.
   function renderEntry() {
-    if (native || !(apple || cfg.used)) return;
+    if (native) return;
     let box = $('rc-settings');
     if (!box) {
       box = document.createElement('div'); box.id = 'rc-settings'; box.style.display = 'contents';

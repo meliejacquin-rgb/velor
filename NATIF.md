@@ -27,7 +27,7 @@ scripts/build-web.mjs   prépare le dossier www/ copié dans les applis
 android/                projet Android Studio
 ios/                    projet Xcode
 confidentialite.html    règles de confidentialité (exigées par Apple et Google)
-.github/workflows/appli-native.yml   construit l'APK Android et vérifie le projet iPhone
+.github/workflows/appli-native.yml   construit et publie l'APK Android
 ```
 
 ## Gratuit, pour le développement comme pour les utilisateurs

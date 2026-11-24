@@ -1,7 +1,7 @@
 # Construit les applis natives de VélOr à chaque modification. Tout est gratuit (GitHub Actions, dépôt public).
 # - Android : produit un fichier .apk. À chaque mise à jour de main, il est publié dans les « Releases »
 #   du dépôt : c'est le lien de téléchargement gratuit pour les utilisateurs (pas de Play Store).
-# - iPhone : vérifie que le projet Xcode compile (l'installation sur un iPhone se fait ensuite depuis un Mac).
+# L'appli iPhone native n'est pas construite ici : sans compte Apple payant, on reste sur la version web.
 name: Appli native
 
 on:
@@ -48,20 +48,3 @@ jobs:
             --title "VélOr Android 1.0.${VERSION_CODE}" --latest \
             --notes "Télécharger VelOr.apk sur le téléphone Android, l'ouvrir et autoriser l'installation. Les mises à jour s'installent par-dessus, sans perdre vos trajets."
 
-  ios:
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      - run: npx cap sync ios
-      - name: Compiler pour le simulateur (sans signature)
-        run: |
-          xcodebuild -project ios/App/App.xcodeproj -scheme App \
-            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO build | tail -40
-          test ${PIPESTATUS[0]} -eq 0
