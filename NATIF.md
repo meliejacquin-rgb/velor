@@ -21,6 +21,7 @@ iPhone et Android grâce à [Capacitor](https://capacitorjs.com), ce qui permet 
 
 ```
 capacitor.config.json   nom et identifiant de l'appli (io.github.meliejacquin.velor)
+sante.js                import des sorties vélo (Raccourci iPhone et appli Android), vérification
 native.js               lien avec Apple Santé / Health Connect (ne fait rien dans un navigateur)
 scripts/build-web.mjs   prépare le dossier www/ copié dans les applis
 android/                projet Android Studio
@@ -39,7 +40,7 @@ Aucun abonnement, aucun magasin d'applis payant :
 | Appli Android | 0 € | construite par GitHub Actions, téléchargée depuis les « Releases » du dépôt (pas de Play Store, qui coûte 25 $) |
 | Health Connect, Apple Santé | 0 € | services intégrés aux téléphones |
 | Strava | 0 € pour l'utilisateur | l'appli Strava (gratuite) envoie ses sorties vers Santé / Health Connect ; VélOr les lit là. L'API Strava directe exige désormais un abonnement Strava payant pour le développeur, donc on ne l'utilise pas. |
-| Appli iPhone sur l'App Store | ✗ | Apple demande 99 €/an : écarté. Sur iPhone, on garde la version web. |
+| Appli iPhone sur l'App Store | ✗ | Apple demande 99 €/an : écarté. Sur iPhone, on garde la version web, avec import Santé par Raccourci. |
 
 ## Android
 
@@ -66,9 +67,15 @@ Le projet `ios/` reste dans le dépôt pour plus tard : avec un Mac, Xcode (grat
 d'installer l'appli sur son propre iPhone, mais elle expire au bout de 7 jours avec un
 compte Apple gratuit.
 
-Piste gratuite pour la détection automatique sur iPhone : un **Raccourci** (appli
-Raccourcis d'Apple) qui lit les sorties vélo dans Santé et les transmet à la version web.
-À construire et tester sur un iPhone.
+**Import gratuit depuis Apple Santé (version web)** : dans Réglages → Apple Santé, VélOr
+explique comment créer un **Raccourci** (appli Raccourcis d'Apple, gratuite) qui copie les
+distances à vélo de l'Apple Watch. Le bouton « Importer » (ou « Santé » sur l'accueil) lit
+ce texte, regroupe les échantillons en trajets (plus de 10 min de pause = nouveau trajet),
+les rapproche des favoris et les propose à vérifier, comme dans l'appli Android
+(`sante.js`). Une automatisation Raccourcis peut le lancer chaque soir.
+
+Format attendu, une ligne par échantillon « Distance à vélo » :
+`2026-11-24T08:05:00+01:00 | 2026-11-24T08:05:30+01:00 | 0,13 | km`
 
 ## Après une modification du code web
 

@@ -81,25 +81,9 @@
     }
   }
 
-  // Transforme une sortie Santé en proposition de trajet, en la rapprochant d'un favori.
+  // Transforme une sortie Santé en proposition de trajet (voir sante.js).
   function suggest({ id, w }) {
-    const st = V.state();
-    const km = Math.round(w.totalDistance / 100) / 10;
-    const min = Math.max(1, Math.round(w.duration / 60));
-    const d = new Date(w.startDate);
-    const fav = st.favs
-      .map(f => ({ f, gap: Math.abs(f.km - km) / f.km }))
-      .filter(x => x.gap <= 0.2)
-      .sort((a, b) => a.gap - b.gap)[0];
-    return {
-      id, km, min, k: V.key(d), date: d,
-      fav: fav ? fav.f.id : null,
-      name: fav ? fav.f.name : 'Sortie vélo',
-      tram: fav ? fav.f.tram : km <= 15, // une longue balade ne remplace pas un ticket
-      src: w.sourceName || NAME,
-      // Un trajet de distance proche existe déjà ce jour-là : sans doute saisi à la main.
-      dup: st.trips.some(t => t.k === V.key(d) && Math.abs(t.km - km) <= Math.max(0.5, km * 0.2))
-    };
+    return window.VelOrSante.suggest({ id, km: w.totalDistance / 1000, min: w.duration / 60, date: new Date(w.startDate), src: w.sourceName || NAME });
   }
 
   function renderBanner() {
@@ -117,36 +101,7 @@
   }
 
   function openReview() {
-    const draw = () => {
-      if (!pending.length) { V.closeSheet(); renderBanner(); return; }
-      const rows = pending.map((p, i) => {
-        const day = p.date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
-        const hour = p.date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-        return `<div class="hc-row">
-          <div class="hc-row-h"><div><b>${V.esc(p.name)} · ${day} ${hour}</b><span class="num">${V.fmtKm(p.km)} · ${p.min} min · ${V.esc(p.src)}</span>${p.dup ? '<span class="hc-dup">Un trajet semblable est déjà noté ce jour-là</span>' : ''}</div><button class="link" data-skip="${i}">Ignorer</button></div>
-          ${V.toggle('hc-t' + i, 'Remplace un ticket de tram', p.tram, '')}
-        </div>`;
-      }).join('');
-      V.openSheet(`<div class="sh-h"><div><b>Sorties vélo détectées</b><span>Trouvées dans ${NAME}</span></div><button class="x" id="sh-close" aria-label="Fermer">✕</button></div>
-        <p class="note" style="text-align:left;margin:0 0 6px">Vérifiez ces trajets. Seuls ceux qui remplacent un ticket de tram comptent dans vos économies ; tous comptent pour la santé et le CO₂.</p>
-        <div class="hc-list">${rows}</div>
-        <button class="btn primary wide" id="hc-add">Ajouter ${pending.length > 1 ? 'les ' + pending.length + ' trajets' : 'le trajet'}</button>
-        <button class="plain" id="hc-none" style="width:100%;margin-top:8px">Tout ignorer</button>`);
-      const keep = () => pending.forEach((p, i) => { const c = $('hc-t' + i); if (c) p.tram = c.checked; });
-      $('sh-close').onclick = () => { keep(); V.closeSheet(); };
-      $('sheet').querySelectorAll('[data-skip]').forEach(b => b.onclick = () => {
-        keep(); const [p] = pending.splice(Number(b.dataset.skip), 1); remember([p.id]); draw();
-      });
-      $('hc-none').onclick = () => { remember(pending.map(p => p.id)); pending = []; V.closeSheet(); renderBanner(); };
-      $('hc-add').onclick = () => {
-        keep();
-        const list = pending.map(p => Object.assign(V.mkTrip({ k: p.k, km: p.km, min: p.min, fav: p.fav, name: p.name, tram: p.tram, dur: 'sante', dist: 'sante' }), { hid: p.id }));
-        remember(pending.map(p => p.id)); pending = [];
-        V.closeSheet(); renderBanner();
-        V.toast(V.addTrips(list));
-      };
-    };
-    draw();
+    window.VelOrSante.review(pending, { name: NAME, remember, after: renderBanner });
   }
 
   function remember(ids) {
