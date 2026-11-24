@@ -337,3 +337,18 @@ button.day:disabled{cursor:default;opacity:.55}
 .tbtn{margin-left:auto;flex:none;font-weight:700;color:var(--gold);border:1px solid currentColor;border-radius:999px;padding:5px 10px;font-size:13px}
 .link.danger{color:var(--warn)}
 .leaflet-container{font-family:var(--font-body)}
+
+/* Appli native : sorties vélo détectées dans Apple Santé / Health Connect */
+.hc-banner{display:flex;align-items:center;gap:12px;width:100%;text-align:left;font:inherit;color:var(--ink);background:var(--health-soft);border:1px solid var(--line);border-radius:18px;padding:12px 14px;margin:0 0 12px;cursor:pointer}
+.hc-banner>span:nth-child(2){flex:1;min-width:0}
+.hc-banner b{display:block;font-size:14px}
+.hc-banner span span{font-size:12.5px;color:var(--muted)}
+.hc-banner>span:last-child{font-size:22px;color:var(--muted)}
+.hc-dot{flex:none;width:10px;height:10px;border-radius:50%;background:var(--health);box-shadow:0 0 0 4px color-mix(in srgb,var(--health) 25%,transparent)}
+.hc-list{display:flex;flex-direction:column;gap:10px;margin:6px 0 14px;max-height:50vh;overflow:auto}
+.hc-row{display:flex;flex-direction:column;gap:6px}
+.hc-row-h{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.hc-row-h b{display:block;font-size:14px}
+.hc-row-h span{display:block;font-size:12.5px;color:var(--muted)}
+.hc-row-h .hc-dup{color:var(--warn)}
+#hc-settings{display:contents}

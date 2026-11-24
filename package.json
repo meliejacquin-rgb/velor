@@ -1,0 +1,22 @@
+{
+  "name": "velor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "VélOr : l'argent économisé en tram grâce au vélo (web + appli iPhone/Android)",
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "node scripts/build-web.mjs",
+    "sync": "npm run build && npx cap sync",
+    "android": "npm run sync && npx cap open android",
+    "ios": "npm run sync && npx cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/core": "^8.6.2",
+    "@capacitor/ios": "^8.6.2",
+    "@capgo/capacitor-health": "^8.13.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.2"
+  }
+}

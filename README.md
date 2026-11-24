@@ -24,6 +24,10 @@ C'est une application web installable (PWA) : elle s'ouvre dans le navigateur, s
 | Distance tracée sur la carte | vol d'oiseau × 1,3 pour tenir compte des rues |
 | Essence | 6,5 L aux 100 km |
 
+## Appli iPhone et Android
+
+VélOr existe aussi en appli native (Capacitor) qui se relie à **Apple Santé** et **Health Connect** : les sorties vélo enregistrées par une montre ou Strava sont détectées et proposées comme trajets. Tout est expliqué dans [NATIF.md](NATIF.md).
+
 ## Lancer en local
 
 Aucune dépendance. Depuis le dossier du projet :
@@ -48,6 +52,7 @@ Pour l'installer sur un téléphone : ouvrir ce lien, puis « Partager → Sur l
 index.html            écrans de l'appli
 styles.css            styles et couleurs
 app.js                logique (calculs, gamification, thèmes, stockage local)
+native.js             Apple Santé / Health Connect (appli native seulement)
 sw.js                 service worker (fonctionnement hors connexion)
 manifest.webmanifest  nom, icônes et couleurs pour l'installation
 icons/                icônes de l'appli
