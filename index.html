@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VélOr</title>
+<meta name="description" content="Suivez l'argent économisé en tram grâce au vélo, votre activité physique et le CO₂ évité.">
+<meta name="theme-color" content="#213BCA">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="VélOr">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- PREMIER LANCEMENT -->
+  <section class="welcome" id="welcome" hidden aria-label="Bienvenue">
+    <form class="inner" id="welcome-form" novalidate>
+      <div data-logo="88"></div>
+      <h1>Vél<span>Or</span></h1>
+      <p class="lead">Chaque trajet à vélo, c'est un ticket de tram que vous n'achetez pas. On les compte pour vous.</p>
+      <div class="field">
+        <label for="w-name">Comment vous appelez-vous ?</label>
+        <input id="w-name" name="name" autocomplete="given-name" maxlength="30" placeholder="Votre prénom">
+        <span class="hint">L'appli vous accueillera avec votre prénom. Vous pourrez le changer dans Réglages.</span>
+      </div>
+      <div class="field"><label>Votre prix de référence</label></div>
+      <div class="radios" role="radiogroup" aria-label="Tarif de référence" id="w-price">
+        <button type="button" class="opt" role="radio" data-price="1.9" aria-checked="true">
+          <span class="radio"></span><span class="t"><b>Ticket à l'unité</b><span>Ce que vous payeriez au coup par coup</span></span><span class="price num">1,90 €</span>
+        </button>
+        <button type="button" class="opt" role="radio" data-price="1.7" aria-checked="false">
+          <span class="radio"></span><span class="t"><b>Carnet de 10 tickets</b><span>17 € le carnet, soit 1,70 € le trajet</span></span><span class="price num">1,70 €</span>
+        </button>
+      </div>
+      <div class="field"><label>Votre thème</label></div>
+      <div class="swatches" role="radiogroup" aria-label="Thème" id="w-swatches"></div>
+      <div class="spacer"></div>
+      <button type="submit" class="btn primary wide">C'est parti</button>
+      <button type="button" class="link" id="w-demo">Découvrir avec des données d'exemple</button>
+    </form>
+  </section>
+
+  <div class="screens" id="screens">
+
+    <!-- ACCUEIL -->
+    <section class="screen" id="s-home" aria-label="Accueil">
+      <div class="top">
+        <div style="min-width:0;display:flex;gap:10px;align-items:center"><span data-logo="40" style="flex:none;line-height:0"></span><div style="min-width:0"><div class="date" id="today-label"></div><h2 id="greeting">Bonjour !</h2></div></div>
+        <div class="chips">
+          <span class="chip flame" title="Série de jours à vélo"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2c1 3.5-1.6 5.3-1.6 8 0 1.4.9 2.4 2 2.4 1.4 0 2.2-1.2 1.9-3.2C17 11 18.5 13.6 18.5 16A6.5 6.5 0 0 1 5.5 16c0-4.4 4.2-6.6 6.5-14z"/></svg><span class="num" id="chip-streak">0</span></span>
+          <span class="chip lvl" title="Niveau"><span>Niv.</span><span class="num" id="chip-lvl">1</span></span>
+        </div>
+      </div>
+
+      <div class="hero">
+        <svg class="rails" viewBox="0 0 150 120" fill="none" stroke="currentColor" stroke-width="6" aria-hidden="true"><circle cx="35" cy="80" r="28"/><circle cx="115" cy="80" r="28"/><path d="M35 80 60 40h40l15 40M60 40l25 40h-50M95 28h14"/></svg>
+        <div class="lbl" id="hero-label">Économisé ce mois-ci</div>
+        <div class="big num" id="hero-amount">0<small>,00 €</small></div>
+        <div class="track" aria-hidden="true"><i id="hero-bar" style="width:0"></i></div>
+        <div class="goal"><span id="hero-goal-l">Objectif du mois</span><span class="num" id="hero-goal-r"></span></div>
+      </div>
+
+      <div class="trio">
+        <div class="stat"><div class="k">Aujourd'hui</div><div class="v num" id="t-day"></div><div class="s num" id="t-day-s"></div></div>
+        <div class="stat"><div class="k">Cette semaine</div><div class="v num" id="t-week"></div><div class="s num" id="t-week-s"></div></div>
+        <div class="stat"><div class="k">Depuis le début</div><div class="v num" id="t-all"></div><div class="s num" id="t-all-s"></div></div>
+      </div>
+
+      <div class="duo">
+        <button class="mini h" data-go="impact"><span class="ico"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.4-9.3C1.2 8.2 3.4 4.5 7 4.5c2 0 3.5 1.1 5 3 1.5-1.9 3-3 5-3 3.6 0 5.8 3.7 4.4 7.2C19.5 16.4 12 21 12 21z"/></svg></span><span><span class="k">Activité semaine</span><span class="v num" id="m-min"></span><span class="k">objectif OMS 150 min</span></span></button>
+        <button class="mini e" data-go="impact"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19c0-8 5-13 15-14-1 10-6 15-14 15"/><path d="M5 19c3-4 6-6 9-8"/></svg></span><span><span class="k">CO₂ évité</span><span class="v num" id="m-co2"></span><span class="k">par rapport à la voiture</span></span></button>
+      </div>
+
+      <div class="log">
+        <h3>J'ai pris le vélo</h3>
+        <p id="log-hint">Un trajet à vélo = un ticket de tram en moins.</p>
+        <div class="btns">
+          <button class="btn ghost" id="add1"><b>Aller simple</b><span class="num" id="add1-p">+1,90 €</span></button>
+          <button class="btn primary" id="add2"><b>Aller-retour</b><span class="num" id="add2-p">+3,80 €</span></button>
+        </div>
+        <div class="undo"><span id="today-trips">0 trajet aujourd'hui</span><button id="undo">Annuler le dernier</button></div>
+      </div>
+
+      <div class="section-h"><h3>Ma semaine</h3><button class="link" data-go="stats">Voir les stats</button></div>
+      <div class="week" id="week"></div>
+      <div class="dayedit" id="dayedit" hidden>
+        <div><b id="de-title"></b><span>Un oubli ? Corrigez le nombre de trajets.</span></div>
+        <div class="stepper"><button id="de-minus" aria-label="Retirer un trajet">−</button><output class="num" id="de-val">0</output><button id="de-plus" aria-label="Ajouter un trajet">+</button></div>
+      </div>
+
+      <div class="section-h"><h3>Prochain badge</h3><button class="link" data-go="defis">Tous les défis</button></div>
+      <div class="teaser" id="teaser"></div>
+    </section>
+
+    <!-- STATS -->
+    <section class="screen" id="s-stats" aria-label="Statistiques" hidden>
+      <div class="top"><div><div class="date">Mes économies</div><h2>Statistiques</h2></div></div>
+      <div class="seg" role="group" aria-label="Période" id="pseg">
+        <button data-p="week" aria-pressed="true">Semaine</button>
+        <button data-p="month" aria-pressed="false">Mois</button>
+        <button data-p="year" aria-pressed="false">Année</button>
+        <button data-p="all" aria-pressed="false">Tout</button>
+      </div>
+      <div class="period">
+        <div class="lbl" id="p-label"></div>
+        <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><div class="big num" id="p-amount"></div><span class="delta" id="p-delta"></span></div>
+        <svg class="chart" id="chart" viewBox="0 0 320 170" role="img" aria-label="Économies par période"></svg>
+      </div>
+      <div class="facts">
+        <div class="fact"><div class="k">Trajets à vélo</div><div class="v num" id="f-trips"></div><div class="s" id="f-trips-s"></div></div>
+        <div class="fact"><div class="k">Carnets non achetés</div><div class="v num" id="f-carnets"></div><div class="s">carnet de 10 à 17 €</div></div>
+        <div class="fact"><div class="k">Moyenne par jour</div><div class="v num" id="f-avg"></div><div class="s">sur la période</div></div>
+        <div class="fact"><div class="k">Meilleur jour</div><div class="v num" id="f-best"></div><div class="s" id="f-best-s"></div></div>
+      </div>
+      <div class="compare" id="compare"></div>
+    </section>
+
+    <!-- IMPACT -->
+    <section class="screen" id="s-impact" aria-label="Santé et planète" hidden>
+      <div class="top"><div><div class="date">Ce que le vélo vous apporte</div><h2>Santé et planète</h2></div></div>
+      <div class="seg three" role="group" aria-label="Période" id="iseg">
+        <button data-ip="week" aria-pressed="false">Semaine</button>
+        <button data-ip="month" aria-pressed="true">Mois</button>
+        <button data-ip="all" aria-pressed="false">Tout</button>
+      </div>
+      <div class="impact h">
+        <div class="head"><span class="ico"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.4-9.3C1.2 8.2 3.4 4.5 7 4.5c2 0 3.5 1.1 5 3 1.5-1.9 3-3 5-3 3.6 0 5.8 3.7 4.4 7.2C19.5 16.4 12 21 12 21z"/></svg></span><b>Santé</b></div>
+        <div class="ringrow">
+          <svg class="ring" viewBox="0 0 120 120" role="img" aria-label="Minutes d'activité cette semaine">
+            <circle class="bgc" cx="60" cy="60" r="50" fill="none" stroke-width="12"/>
+            <circle class="fgc" id="ring-fg" cx="60" cy="60" r="50" fill="none" stroke-width="12" stroke-linecap="round" stroke-dasharray="314.16" stroke-dashoffset="314.16" transform="rotate(-90 60 60)"/>
+            <text x="60" y="60" text-anchor="middle" font-size="26" font-weight="800" id="ring-n">0</text>
+            <text class="sub" x="60" y="78" text-anchor="middle" font-size="11">/ 150 min</text>
+          </svg>
+          <div class="txt"><b id="ring-t">Activité de la semaine</b><span>L'OMS recommande 150 minutes d'activité modérée par semaine.</span></div>
+        </div>
+        <div class="cells">
+          <div class="cell"><div class="k">Temps à vélo</div><div class="v num" id="h-time"></div></div>
+          <div class="cell"><div class="k">Calories</div><div class="v num" id="h-kcal"></div></div>
+          <div class="cell"><div class="k">Distance</div><div class="v num" id="h-km"></div></div>
+        </div>
+        <ul class="effects" id="effects"></ul>
+        <div>
+          <div style="font-weight:700;font-size:14px;margin-bottom:6px">Comment vous sentez-vous après le trajet&nbsp;?</div>
+          <div class="mood" id="mood"></div>
+          <div class="src" id="mood-s" style="margin-top:6px"></div>
+        </div>
+      </div>
+      <div class="impact e">
+        <div class="head"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19c0-8 5-13 15-14-1 10-6 15-14 15"/><path d="M5 19c3-4 6-6 9-8"/></svg></span><b>Empreinte écologique</b></div>
+        <div><div class="co2big num" id="e-car"></div><div style="font-size:13px;color:var(--muted)">de CO₂ évités par rapport au même trajet en voiture</div></div>
+        <div class="vs" id="e-vs"></div>
+        <div class="cells">
+          <div class="cell"><div class="k">vs tram</div><div class="v num" id="e-tram"></div></div>
+          <div class="cell"><div class="k">Km sans moteur</div><div class="v num" id="e-km"></div></div>
+          <div class="cell"><div class="k">Litres d'essence</div><div class="v num" id="e-fuel"></div></div>
+        </div>
+        <div class="src">Estimations par km et par passager, d'après les ordres de grandeur ADEME : voiture thermique ≈ 218 g, bus ≈ 113 g, tram ≈ 4 g, vélo 0 g de CO₂. Calories : effort modéré, selon votre poids.</div>
+      </div>
+    </section>
+
+    <!-- DÉFIS -->
+    <section class="screen" id="s-defis" aria-label="Défis" hidden>
+      <div class="top"><div><div class="date">Gamification</div><h2>Défis et badges</h2></div></div>
+      <div class="level">
+        <div class="badge-lvl num" id="lv-n">1</div>
+        <div class="info">
+          <div class="name" id="lv-name"></div>
+          <div class="track" style="margin-top:8px"><i id="lv-bar"></i></div>
+          <div class="xp num"><span id="lv-xp"></span><span id="lv-next"></span></div>
+        </div>
+      </div>
+      <div class="streak">
+        <div class="n num" id="st-n">0</div>
+        <div class="t"><b>jours d'affilée à vélo</b><span id="st-s">Les week-ends ne cassent pas la série.</span></div>
+      </div>
+      <div class="section-h"><h3>Objectifs en cours</h3></div>
+      <div class="goal-card" id="g-month"></div>
+      <div class="goal-card" id="g-week"></div>
+      <div class="section-h"><h3>Badges</h3><span class="note num" id="bdg-count"></span></div>
+      <div class="badges" id="badges"></div>
+    </section>
+
+    <!-- RÉGLAGES -->
+    <section class="screen" id="s-reglages" aria-label="Réglages" hidden>
+      <div class="top"><div><div class="date">Préférences</div><h2>Réglages</h2></div></div>
+      <div class="section-h"><h3>Mon profil</h3></div>
+      <div class="profile">
+        <div class="avatar" id="avatar" aria-hidden="true">?</div>
+        <div class="field">
+          <label for="p-name">Prénom</label>
+          <input id="p-name" autocomplete="given-name" maxlength="30" placeholder="Votre prénom">
+          <span class="hint">Utilisé pour vous accueillir sur l'écran d'accueil.</span>
+        </div>
+      </div>
+      <div class="section-h"><h3>Couleurs de l'appli</h3></div>
+      <div class="swatches" role="radiogroup" aria-label="Palette de couleurs" id="swatches"></div>
+      <div class="modes" role="radiogroup" aria-label="Apparence" id="modes">
+        <button role="radio" data-mode="auto" aria-checked="true">Auto</button>
+        <button role="radio" data-mode="light" aria-checked="false">Clair</button>
+        <button role="radio" data-mode="dark" aria-checked="false">Sombre</button>
+      </div>
+      <div class="section-h"><h3>Prix de référence d'un trajet</h3></div>
+      <div class="radios" role="radiogroup" aria-label="Tarif de référence" id="s-price">
+        <button class="opt" role="radio" data-price="1.9" aria-checked="true">
+          <span class="radio"></span><span class="t"><b>Ticket à l'unité</b><span>Ce que vous payeriez au coup par coup</span></span><span class="price num">1,90 €</span>
+        </button>
+        <button class="opt" role="radio" data-price="1.7" aria-checked="false">
+          <span class="radio"></span><span class="t"><b>Carnet de 10 tickets</b><span>17 € le carnet, soit 1,70 € le trajet</span></span><span class="price num">1,70 €</span>
+        </button>
+      </div>
+      <div class="section-h"><h3>Objectifs</h3></div>
+      <div class="setting">
+        <div class="t"><b>Objectif mensuel</b><span>Montant à économiser chaque mois</span></div>
+        <div class="stepper"><button data-step="goalM:-5" aria-label="Diminuer">−</button><output class="num" id="v-goalM"></output><button data-step="goalM:5" aria-label="Augmenter">+</button></div>
+      </div>
+      <div class="setting">
+        <div class="t"><b>Objectif hebdomadaire</b><span>Nombre de trajets à vélo par semaine</span></div>
+        <div class="stepper"><button data-step="goalW:-1" aria-label="Diminuer">−</button><output class="num" id="v-goalW"></output><button data-step="goalW:1" aria-label="Augmenter">+</button></div>
+      </div>
+      <div class="section-h"><h3>Mon trajet type</h3></div>
+      <div class="setting">
+        <div class="t"><b>Durée d'un trajet</b><span>Sert au calcul des minutes d'activité</span></div>
+        <div class="stepper"><button data-step="min:-5" aria-label="Diminuer">−</button><output class="num" id="v-min"></output><button data-step="min:5" aria-label="Augmenter">+</button></div>
+      </div>
+      <div class="setting">
+        <div class="t"><b>Distance d'un trajet</b><span>Sert au calcul du CO₂ évité</span></div>
+        <div class="stepper"><button data-step="km:-1" aria-label="Diminuer">−</button><output class="num" id="v-km"></output><button data-step="km:1" aria-label="Augmenter">+</button></div>
+      </div>
+      <div class="setting">
+        <div class="t"><b>Mon poids</b><span>Sert au calcul des calories</span></div>
+        <div class="stepper"><button data-step="kg:-1" aria-label="Diminuer">−</button><output class="num" id="v-kg"></output><button data-step="kg:1" aria-label="Augmenter">+</button></div>
+      </div>
+      <div class="section-h"><h3>Mes données</h3></div>
+      <div class="actions">
+        <button class="plain" id="export">Exporter (.json)</button>
+        <label class="plain" for="import-file" style="cursor:pointer">Importer</label>
+        <input type="file" id="import-file" accept="application/json,.json" hidden>
+      </div>
+      <div id="reset-zone"></div>
+      <p class="note">Vos données restent sur ce téléphone. VélOr ne les envoie nulle part.</p>
+    </section>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <nav class="tabs" aria-label="Navigation" id="tabs">
+    <button data-go="home" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>Accueil</button>
+    <button data-go="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 20h16"/><path d="M7 16v-5M12 16V6M17 16v-8"/></svg>Stats</button>
+    <button data-go="impact"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.3-8.7-8.6C2 8.1 4 4.8 7.2 4.8c1.9 0 3.3 1 4.8 2.8 1.5-1.8 2.9-2.8 4.8-2.8 3.2 0 5.2 3.3 3.9 6.6C19 15.7 12 20 12 20z"/><path d="M7 12h3l1.5-2.5L13 14l1.5-2H17"/></svg>Impact</button>
+    <button data-go="defis"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M9 20h6"/></svg>Défis</button>
+    <button data-go="reglages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>Réglages</button>
+  </nav>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
