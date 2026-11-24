@@ -7,13 +7,25 @@ android {
         applicationId "io.github.meliejacquin.velor"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // Numéro de version fourni par GitHub Actions à chaque publication (sinon 1 en local).
+        versionCode (System.getenv("VERSION_CODE") ?: "1").toInteger()
+        versionName "1.0." + (System.getenv("VERSION_CODE") ?: "0")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    // Clé de signature fixe pour l'APK distribué gratuitement sur GitHub (hors Play Store) :
+    // la même clé à chaque version permet d'installer les mises à jour par-dessus.
+    // Elle est publique, donc l'APK officiel est uniquement celui des « Releases » du dépôt.
+    signingConfigs {
+        debug {
+            storeFile file('velor-debug.keystore')
+            storePassword 'velor-public'
+            keyAlias 'velor'
+            keyPassword 'velor-public'
         }
     }
     buildTypes {

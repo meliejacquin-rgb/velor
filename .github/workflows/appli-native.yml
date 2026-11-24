@@ -1,5 +1,6 @@
-# Construit les applis natives de VélOr à chaque modification.
-# - Android : produit un fichier .apk à installer sur un téléphone (onglet Actions → la dernière exécution → « Artifacts »).
+# Construit les applis natives de VélOr à chaque modification. Tout est gratuit (GitHub Actions, dépôt public).
+# - Android : produit un fichier .apk. À chaque mise à jour de main, il est publié dans les « Releases »
+#   du dépôt : c'est le lien de téléchargement gratuit pour les utilisateurs (pas de Play Store).
 # - iPhone : vérifie que le projet Xcode compile (l'installation sur un iPhone se fait ensuite depuis un Mac).
 name: Appli native
 
@@ -9,9 +10,14 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   android:
     runs-on: ubuntu-latest
+    env:
+      VERSION_CODE: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,6 +38,15 @@ jobs:
         with:
           name: VelOr-android
           path: android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Publier dans les Releases (seulement sur main)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk VelOr.apk
+          gh release create "android-v1.0.${VERSION_CODE}" VelOr.apk \
+            --title "VélOr Android 1.0.${VERSION_CODE}" --latest \
+            --notes "Télécharger VelOr.apk sur le téléphone Android, l'ouvrir et autoriser l'installation. Les mises à jour s'installent par-dessus, sans perdre vos trajets."
 
   ios:
     runs-on: macos-15

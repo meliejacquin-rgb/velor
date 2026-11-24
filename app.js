@@ -761,6 +761,8 @@
 
   // Pas de service worker dans l'appli native : les fichiers sont déjà dans l'appli.
   const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  // Sur un téléphone Android, dans le navigateur : proposer l'appli native (gratuite, hors Play Store).
+  if (!isNative && /Android/i.test(navigator.userAgent)) { $('get-android').hidden = false; $('get-android').style.display = 'contents'; }
   if (!isNative && 'serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
   }
