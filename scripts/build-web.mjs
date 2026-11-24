@@ -5,7 +5,7 @@ import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 const out = 'www';
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out);
-for (const f of ['styles.css', 'app.js', 'native.js', 'manifest.webmanifest', 'confidentialite.html']) cpSync(f, `${out}/${f}`);
+for (const f of ['styles.css', 'app.js', 'sante.js', 'native.js', 'manifest.webmanifest', 'confidentialite.html']) cpSync(f, `${out}/${f}`);
 cpSync('icons', `${out}/icons`, { recursive: true });
 // Health Connect affiche cette page quand on touche « Règles de confidentialité ».
 cpSync('confidentialite.html', `${out}/privacypolicy.html`);
